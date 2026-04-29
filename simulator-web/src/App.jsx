@@ -5,10 +5,10 @@ import { Unity, useUnityContext } from "react-unity-webgl";
 function App() {
   // 這裡的網址對應的就是你取消壓縮後的純淨檔案
   const { unityProvider } = useUnityContext({
-    loaderUrl: "/Build/Build.loader.js",
-    dataUrl: "/Build/Build.data",
-    frameworkUrl: "/Build/Build.framework.js",
-    codeUrl: "/Build/Build.wasm",
+    loaderUrl: "/Build/Build_WebGL.loader.js",
+    dataUrl: "/Build/Build_WebGL.data",
+    frameworkUrl: "/Build/Build_WebGL.framework.js",
+    codeUrl: "/Build/Build_WebGL.wasm",
   });
 
   return (
