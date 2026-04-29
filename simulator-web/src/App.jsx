@@ -17,7 +17,15 @@ function App() {
       <p>第一台 3D 車輛登場！</p>
       
       <div style={{ border: "2px solid #ccc", borderRadius: "8px", overflow: "hidden" }}>
-        <Unity unityProvider={unityProvider} style={{ width: "960px", height: "600px" }} />
+        <Unity 
+  unityProvider={unityProvider} 
+  style={{ 
+    width: "100%", 
+    height: "calc(100vh - 60px)", /* 100vh 代表螢幕的可視高度 */
+    // 如果你們有網頁標題列，可以改成 height: "calc(100vh - 60px)" 之類的來扣掉標題高度
+    border: "none" 
+  }} 
+/>
       </div>
     </div>
   );
