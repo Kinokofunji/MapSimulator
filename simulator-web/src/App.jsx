@@ -13,8 +13,8 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "50px" }}>
-      <h1>沉浸式實景地圖模擬器 - 開發測試</h1>
-      <p>我們的第一台 3D 車輛（方塊）即將登場！</p>
+      <h1>沉浸式實景地圖平台</h1>
+      <p>第一台 3D 車輛登場！</p>
       
       <div style={{ border: "2px solid #ccc", borderRadius: "8px", overflow: "hidden" }}>
         <Unity unityProvider={unityProvider} style={{ width: "960px", height: "600px" }} />
