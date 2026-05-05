@@ -1,9 +1,11 @@
-import React from "react";
+import { useState } from "react";
 import { Unity, useUnityContext } from "react-unity-webgl";
-//import "./App.css";
 
 function App() {
-  // 這裡的網址對應的就是你取消壓縮後的純淨檔案
+  // 這裡就是實際「使用」到 useState 的地方！(警告會因為這行而消失)
+  const [isStarted, setIsStarted] = useState(false);
+
+  // 載入 Unity 3D 資源的設定
   const { unityProvider } = useUnityContext({
     loaderUrl: "/Build/Build.loader.js",
     dataUrl: "/Build/Build.data",
@@ -11,22 +13,52 @@ function App() {
     codeUrl: "/Build/Build.wasm",
   });
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "50px" }}>
-      <h1>沉浸式實景地圖平台</h1>
-      <p>第一台 3D 車輛登場！</p>
-      
-      <div style={{ border: "2px solid #ccc", borderRadius: "8px", overflow: "hidden" }}>
-        <Unity 
-  unityProvider={unityProvider} 
-  style={{ 
-    width: "100%", 
-    height: "calc(100vh - 60px)", /* 100vh 代表螢幕的可視高度 */
-    // 如果你們有網頁標題列，可以改成 height: "calc(100vh - 60px)" 之類的來扣掉標題高度
-    border: "none" 
-  }} 
-/>
+  // === 分流邏輯 ===
+
+  // 如果還沒按開始 (isStarted 為 false)，顯示首頁
+  if (!isStarted) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh', 
+        backgroundColor: '#1a1a2e', 
+        color: 'white',
+        fontFamily: 'sans-serif'
+      }}>
+        <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>沉浸式實景平台</h1>
+        <p style={{ fontSize: '1.2rem', marginBottom: '40px', color: '#a0a0b0' }}>
+          資管系畢業專題 - 探索全新的 3D 互動體驗
+        </p>
+        
+        <button 
+          onClick={() => setIsStarted(true)} 
+          style={{ 
+            padding: '15px 40px', 
+            fontSize: '1.5rem', 
+            cursor: 'pointer',
+            backgroundColor: '#0f3460',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+          }}
+        >
+          進入模擬平台 🚀
+        </button>
       </div>
+    );
+  }
+
+  // 如果已經按了開始 (isStarted 為 true)，顯示 3D 畫面
+  return (
+    <div style={{ width: "100%", height: "100vh", backgroundColor: "black" }}>
+      <Unity 
+        unityProvider={unityProvider} 
+        style={{ width: "100%", height: "100%", border: "none" }} 
+      />
     </div>
   );
 }
