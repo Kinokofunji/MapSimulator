@@ -21,10 +21,10 @@ function App() {
     return (
       // 把原本落落長的 style 換成 className="landing-page"
       <div className="landing-page">
-        <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>沉浸式實景平台</h1>
+        <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}></h1>
         {/* ... 下面的按鈕和文字維持不變 ... */}
         <p style={{ fontSize: '1.2rem', marginBottom: '40px', color: '#a0a0b0' }}>
-          資管系畢業專題 - 探索全新的 3D 互動體驗
+          
         </p>
         
         <button 

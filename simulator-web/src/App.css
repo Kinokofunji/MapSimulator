@@ -188,17 +188,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100vw; 
   height: 100vh;
+  margin: 0;
   color: white;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  /* 下面是動態漸層的魔法 */
-  background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #0d1117);
-  background-size: 400% 400%;
-  animation: gradientBG 15s ease infinite;
-}
-
-@keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  
+  /* === 魔法在這裡：載入圖片 === */
+  /* url('/bg.jpg') 會去 public 資料夾抓圖片 */
+  /* 前面的 linear-gradient 是一層「半透明的黑色玻璃紙」，用來蓋在圖片上，確保你的白色標題不會被花俏的背景吃掉 */
+  background-image: /*linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),*/ url('/homepage4.png');
+  
+  /* 讓圖片完美填滿整個螢幕，不變形 */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
