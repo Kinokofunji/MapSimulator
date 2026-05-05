@@ -182,3 +182,23 @@
     border-right-color: var(--border);
   }
 }
+/* App.css */
+.landing-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* 下面是動態漸層的魔法 */
+  background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #0d1117);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

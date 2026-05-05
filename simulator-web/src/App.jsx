@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Unity, useUnityContext } from "react-unity-webgl";
+import './App.css';
 
 function App() {
   // 這裡就是實際「使用」到 useState 的地方！(警告會因為這行而消失)
@@ -18,17 +19,10 @@ function App() {
   // 如果還沒按開始 (isStarted 為 false)，顯示首頁
   if (!isStarted) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100vh', 
-        backgroundColor: '#1a1a2e', 
-        color: 'white',
-        fontFamily: 'sans-serif'
-      }}>
+      // 把原本落落長的 style 換成 className="landing-page"
+      <div className="landing-page">
         <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>沉浸式實景平台</h1>
+        {/* ... 下面的按鈕和文字維持不變 ... */}
         <p style={{ fontSize: '1.2rem', marginBottom: '40px', color: '#a0a0b0' }}>
           資管系畢業專題 - 探索全新的 3D 互動體驗
         </p>
