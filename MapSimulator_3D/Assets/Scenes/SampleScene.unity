@@ -1304,19 +1304,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.99998784
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 6.1533734e-17
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.00493433
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 6.0929456e-17
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1324,7 +1324,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: -0.565
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400008, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -1374,6 +1374,10 @@ PrefabInstance:
       propertyPath: m_Center.z
       value: 0.0835476
       objectReference: {fileID: 0}
+    - target: {fileID: 6500000, guid: f33fcdf90e7034971b3e1a639b7b0355, type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 13400000, guid: 834ee3f928be6304d82d7b2d12765fec, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -2078,8 +2082,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe654ce055530604fb4967d44a022772, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 15
+  speed: 5
+  maxSpeed: 30
+  acceleration: 5
+  deceleration: 3
   turnSpeed: 60
+  rb: {fileID: 1828601341}
   speedText: {fileID: 1894954605}
 --- !u!54 &1828601341
 Rigidbody:
@@ -2105,8 +2113,8 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
+  m_Interpolate: 1
+  m_Constraints: 112
   m_CollisionDetection: 2
 --- !u!65 &1828601342
 BoxCollider:

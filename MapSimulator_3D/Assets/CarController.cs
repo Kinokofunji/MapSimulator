@@ -1,67 +1,118 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using TMPro;
 
 public class CarController : MonoBehaviour
 {
     public float speed = 15f;
-    public float turnSpeed = 80f;
+    
 
-    // Àx¦s¤â¾÷µe­±ªºµêÀÀ«ö¶s¿é¤J­È
+    // å„²å­˜æ‰‹æ©Ÿç•«é¢çš„è™›æ“¬æŒ‰éˆ•è¼¸å…¥å€¼
     private float mobileMove = 0f;
     private float mobileTurn = 0f;
 
-    [Header("»öªíªO UI ³]©w")]
-    public TMP_Text speedText; // ¥Î¨Ó¸Ë§Ú­Ì­è­è«Ø¥ßªº¤å¦r UI
-    private Vector3 lastPosition; // °O¾Ğ¨®¤l¤W¤@¬íªº¦ì¸m
+    [Header("è»Šè¼›ç‰©ç†åƒæ•¸")]
+    public float maxSpeed = 15f;      // æœ€é«˜é€Ÿåº¦é™åˆ¶
+    public float acceleration = 5f;   // åŠ é€ŸåŠ›é“ (æ•¸å€¼è¶Šå¤§ï¼Œèµ·æ­¥è¶Šå¿«)
+    public float deceleration = 3f;   // ç…è»Š/æ»‘è¡Œé˜»åŠ› (æ•¸å€¼è¶Šå°ï¼Œæ»‘è¡Œè¶Šé )
+    public float turnSpeed = 100f;    // æ§åˆ¶è»Šå­å·¦å³è½‰çš„é€Ÿåº¦
+    private float currentSpeed = 0f;  // è¨˜æ†¶è»Šè¼›ç•¶å‰çš„çœŸå¯¦é€Ÿåº¦ (ä¸è¦åœ¨ä»‹é¢ä¸Šæ”¹å®ƒ)
+    public Rigidbody rb;  // å®£å‘Š rb è®Šæ•¸
+
+    [Header("å„€è¡¨æ¿ UI è¨­å®š")]
+    public TMP_Text speedText; // ç”¨ä¾†è£æˆ‘å€‘å‰›å‰›å»ºç«‹çš„æ–‡å­— UI
+    private Vector3 lastPosition; // è¨˜æ†¶è»Šå­ä¸Šä¸€ç§’çš„ä½ç½®
 
     void Start()
     {
-        // ¹CÀ¸¤@¶}©l¡A¥ı°O¿ı¨®¤lªº°_©l¦ì¸m
+        // éŠæˆ²ä¸€é–‹å§‹ï¼Œå…ˆè¨˜éŒ„è»Šå­çš„èµ·å§‹ä½ç½®
         lastPosition = transform.position;
+    }
+
+    void FixedUpdate()
+    {
+        // 1. é€éå…§ç© (Dot Product) ç®—å‡ºè»Šå­åœ¨çœŸå¯¦ä¸–ç•Œä¸­ï¼Œå¾€è»Šé ­æ–¹å‘çš„ã€Œå¯¦éš›é€Ÿåº¦ã€
+        float actualForwardSpeed = Vector3.Dot(transform.forward, rb.velocity);
+
+        // 2. å¦‚æœã€Œå¤§è…¦ä»¥ç‚ºçš„é€Ÿåº¦(currentSpeed)ã€è·Ÿã€ŒçœŸå¯¦é€Ÿåº¦ã€è½å·®å¤ªå¤§ (ä»£è¡¨æ’ç‰†è¢«æ“‹ä½äº†)
+        if (Mathf.Abs(currentSpeed) - Mathf.Abs(actualForwardSpeed) > 1f)
+        {
+            // å¼·åˆ¶è®“å¤§è…¦æ¸…é†’ï¼ŒæŠŠé€Ÿåº¦é™åˆ°è·Ÿç¾å¯¦ä¸€æ¨£ã€‚
+            // é€™æ¨£ä½ ä¸€æŒ‰å€’è»Šï¼Œé€Ÿåº¦å°±æœƒç›´æ¥å¾ 0 é–‹å§‹å¾€å¾Œæ‰£ï¼Œç¬é–“è„«å›°ï¼
+            currentSpeed = actualForwardSpeed;
+        }
+        // 1. å–å¾—ç©å®¶è¼¸å…¥
+        // Vertical æ˜¯å‰å¾Œ (W/S æˆ– ä¸Š/ä¸‹)
+        // Horizontal æ˜¯å·¦å³ (A/D æˆ– å·¦/å³)
+        float moveInput = Input.GetAxisRaw("Vertical"); 
+        float turnInput = Input.GetAxisRaw("Horizontal"); // è®€å–å·¦å³æŒ‰éµ
+        // æ–¹å‘ç›¤æ­»å€ (Deadzone)
+        // åªè¦å·¦å³è¼¸å…¥çš„æ•¸å€¼å°æ–¼ 0.1ï¼Œå°±ç•¶ä½œæ²’æŒ‰ï¼Œå¼·åˆ¶æ­¸é›¶ã€‚
+        // é€™èƒ½å¾¹åº•è§£æ±ºå› ç‚ºè¨­å‚™é£„ç§»æˆ–é›œè¨Šå°è‡´çš„ã€Œç›´èµ°åå‘ã€å•é¡Œï¼
+        if (Mathf.Abs(turnInput) < 0.1f)
+        {
+            turnInput = 0f;
+        }
+        // 2. å‡ç´šç‰ˆæ²¹é–€èˆ‡ç…è»Šé‚è¼¯
+        if (Mathf.Abs(moveInput) > 0)
+        {
+            // åˆ¤æ–·æ˜¯å¦åœ¨ã€Œç…è»Š/æ€¥æ›æª”ã€ï¼šè¼¸å…¥æ–¹å‘(moveInput)èˆ‡ç•¶å‰é€Ÿåº¦(currentSpeed)æ­£è² è™Ÿç›¸å
+            // ä¾‹å¦‚ï¼šæ­£åœ¨å¾€å‰(é€Ÿåº¦ç‚ºæ­£)ï¼Œä½†ç©å®¶æŒ‰ä¸‹é€€(è¼¸å…¥ç‚ºè² )
+            if (moveInput * currentSpeed < 0)
+            {
+                // çµ¦äºˆ 2 å€çš„æ¸›é€ŸåŠ›é“ï¼Œè®“ä½ æ’ç‰†å¾Œå€’è»Šèƒ½è¿…é€Ÿåˆ‡æ›çˆ†ç™¼ï¼
+                currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed * moveInput, deceleration * 2f * Time.deltaTime);
+            }
+            else
+            {
+                // æ­£å¸¸è¸©æ²¹é–€åŠ é€Ÿ
+                currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed * moveInput, acceleration * Time.deltaTime);
+            }
+        }
+        else
+        {
+            // æ”¾é–‹æŒ‰éµï¼Œè‡ªç„¶æ»‘è¡Œ
+            currentSpeed = Mathf.MoveTowards(currentSpeed, 0, deceleration * Time.deltaTime);
+        }
+
+        // 3. å¥—ç”¨å‰é€²é€Ÿåº¦åˆ°ç‰©ç†å¼•æ“
+        Vector3 forwardMove = transform.forward * currentSpeed;
+        rb.velocity = new Vector3(forwardMove.x, rb.velocity.y, forwardMove.z);
+
+        // === å·¦å³è½‰å‘ (Steering) ===
+        float currentRealSpeed = rb.velocity.magnitude;  // åªçœ‹ç›®å‰çš„çœŸå¯¦ç‰©ç†é€Ÿåº¦ (magnitude)        
+        if (currentRealSpeed > 0.1f)  // é€Ÿåº¦å¤§æ–¼ 0.1 æ‰æœ‰è½‰å‘èƒ½åŠ›
+        {
+            // å€’è»Šæ™‚åè½‰æ–¹å‘ç›¤
+            float directionMultiplier = (Vector3.Dot(transform.forward, rb.velocity) > 0) ? 1f : -1f;
+
+            // âš ï¸ é—œéµï¼šæŠŠè½‰å‘è§’åº¦ä¹˜ä¸Š (ç•¶å‰é€Ÿåº¦ / æœ€é«˜é€Ÿåº¦) çš„æ¯”ä¾‹ï¼
+            // é€™æ¨£é–‹å¾—è¶Šæ…¢ï¼Œè½‰å½è¶Šç·©æ…¢ï¼ŒåŸåœ°çµ•å°è½‰ä¸å‹•ã€‚
+            // åªè¦é€Ÿåº¦è¶…é 3 (å¯ä¾æ‰‹æ„Ÿå¾®èª¿)ï¼Œæ–¹å‘ç›¤éˆæ•åº¦å°±æœƒé”åˆ° 100%
+            float speedFactor = Mathf.Clamp01(currentRealSpeed / 3f);
+            float turnAmount = turnInput * turnSpeed * directionMultiplier * speedFactor * Time.fixedDeltaTime;
+
+            transform.Rotate(Vector3.up * turnAmount);
+        }
     }
 
     void Update()
     {
-        // µ²¦X¹q¸£Áä½L»P¤â¾÷«ö¶sªº¿é¤J¡]¥u­n¨ä¤¤¤@­Ó¦³°Ê§@¡A¨®¤l´N·|°Ê¡^
-        float finalMove = Input.GetAxis("Vertical") + mobileMove;
-        float finalTurn = Input.GetAxis("Horizontal") + mobileTurn;
-
-        // ­­¨î¼Æ­È¦b -1 ¨ì 1 ¤§¶¡¡AÁ×§Kª±®a¦P®É«öÁä½L¤S«ö¤â¾÷¾É­P³t«×¼É¨«
-        finalMove = Mathf.Clamp(finalMove, -1f, 1f);
-        finalTurn = Mathf.Clamp(finalTurn, -1f, 1f);
-
-        // °õ¦æ²¾°Ê»P±ÛÂà
-        transform.Translate(Vector3.forward * finalMove * speed * Time.deltaTime);
-        transform.Rotate(Vector3.up * finalTurn * turnSpeed * Time.deltaTime);
-
-        // === ¥H¤U¬O·s¼Wªº¡u´ú³t·Ó¬Û¾÷¡vÅŞ¿è ===
-
-        // 1. ºâ¥X³o­Ó¼v®æ¤º¡A¨®¤l²¾°Ê¤F¦h»· (¥Ø«e¦ì¸m ´î¥h ¤W¤@´V¦ì¸m)
-        float distance = Vector3.Distance(transform.position, lastPosition);
-
-        // 2. ¶ZÂ÷°£¥H®É¶¡ = ¯u¹ê¬í³t (m/s)
-        float speedMS = distance / Time.deltaTime;
-
-        // 3. ¬í³t­¼¤W 3.6 Âà´«¦¨§Ú­Ì¼ô±xªº®É³t (km/h)¡A¨Ã¥|±Ë¤­¤J¦¨¾ã¼Æ
-        int speedKMH = Mathf.RoundToInt(speedMS * 3.6f);
-
-        // 4. §âºâ¥X¨Óªº®É³t¡A¼g¤Jµe­±¤Wªº¤å¦r UI ¸Ì
-        if (speedText != null)
+        // å¦‚æœä½ æœ‰ç¶å®š speedTextï¼Œæ‰åŸ·è¡Œæ›´æ–°
+        if (speedText != null && rb != null)
         {
-            // Åı¼Æ¦r«e­±¸É 0¡]¨Ò¦pÅÜ¦¨ 005 km/h¡A§ó¦³»öªíªOªº·PÄ±¡^
+            // rb.velocity.magnitude æœƒç›´æ¥å›å‚³çœŸå¯¦çš„ç§»å‹•ç§’é€Ÿ
+            float speedMS = rb.velocity.magnitude;
+            int speedKMH = Mathf.RoundToInt(speedMS * 3.6f);
             speedText.text = speedKMH.ToString("000") + " km/h";
         }
-
-        // 5. ¬ö¿ı³o¦¸ªº¦ì¸m¡Aµ¹¤U¤@­Ó¼v®æÄ~Äòºâ
-        lastPosition = transform.position;
     }
 
-    // --- ¥H¤U¬O¶}©ñµ¹¤â¾÷ UI «ö¶s©I¥sªº±MÄİ¨ç¼Æ ---
+    // --- ä»¥ä¸‹æ˜¯é–‹æ”¾çµ¦æ‰‹æ©Ÿ UI æŒ‰éˆ•å‘¼å«çš„å°ˆå±¬å‡½æ•¸ ---
     public void PressForward() { mobileMove = 1f; }
     public void PressBackward() { mobileMove = -1f; }
-    public void ReleaseMove() { mobileMove = 0f; } // ©ñ¶}ªoªù©Î­Ë¨®
+    public void ReleaseMove() { mobileMove = 0f; } // æ”¾é–‹æ²¹é–€æˆ–å€’è»Š
 
     public void PressRight() { mobileTurn = 1f; }
     public void PressLeft() { mobileTurn = -1f; }
-    public void ReleaseTurn() { mobileTurn = 0f; } // ©ñ¶}¤è¦V½L
+    public void ReleaseTurn() { mobileTurn = 0f; } // æ”¾é–‹æ–¹å‘ç›¤
 }
