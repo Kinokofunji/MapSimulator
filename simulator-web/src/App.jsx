@@ -27,21 +27,72 @@ function App() {
           
         </p>
         
-        <button 
-          onClick={() => setIsStarted(true)} 
-          style={{ 
-            padding: '15px 40px', 
-            fontSize: '1.5rem', 
-            cursor: 'pointer',
-            backgroundColor: '#0f3460',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-          }}
-        >
-          進入模擬平台 🚀
-        </button>
+        {/* === 按鈕群組區域 === */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          
+          {/* 原本的主按鈕 */}
+          <button 
+            onClick={() => setIsStarted(true)} 
+            style={{ 
+              padding: '15px 40px', 
+              fontSize: '1.5rem', 
+              cursor: 'pointer',
+              backgroundColor: '#0f3460',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+              transition: 'transform 0.2s' // 加入一點小動畫預備
+            }}
+          >
+            進入模擬平台 🚀
+          </button>
+
+          {/* 新增的三個副按鈕（水平排列） */}
+          <div style={{ display: 'flex', gap: '15px' }}>
+            
+            {/* 按鈕一 */}
+            <button style={{
+              padding: '10px 20px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)', // 半透明背景
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.5)', // 白色細邊框
+              borderRadius: '6px',
+            }}>
+              進入VR
+            </button>
+
+            {/* 按鈕二 */}
+            <button style={{
+              padding: '10px 20px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+              borderRadius: '6px',
+            }}>
+              進入AR
+            </button>
+
+            {/* 按鈕三 */}
+            <button style={{
+              padding: '10px 20px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+              borderRadius: '6px',
+            }}>
+              開發團隊 👥
+            </button>
+
+          </div>
+        </div>
+        {/* === 按鈕群組區域結束 === */}
       </div>
     );
   }
