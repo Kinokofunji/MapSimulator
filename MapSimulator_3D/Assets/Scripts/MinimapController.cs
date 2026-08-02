@@ -217,14 +217,21 @@ public class MinimapController : MonoBehaviour, IPointerClickHandler
     /// <summary>
     /// 世界座標 -> 小地圖 RawImage 上的本地座標（以攝影機目前實際俯視的中心點為準，
     /// 不能直接假設是玩家位置——全景地圖展開時攝影機中心可能是城市範圍中心）。
+    ///
+    /// 攝影機用的 RenderTexture 是正方形（orthographicSize 在 X/Z 兩個方向涵蓋一樣寬的世界範圍），
+    /// 但顯示用的面板不一定是正方形（例如 FullMapPanel 會被拉伸成貼齊畫面的長方形），
+    /// 所以 X、Y 兩個方向的「每世界單位對應幾個像素」要分開算，不能共用同一個比例，
+    /// 否則長方形面板上下(或左右)方向會被壓縮，點擊/標記位置離中心越遠、誤差越大。
     /// </summary>
     private Vector2 WorldToMinimapLocal(Vector3 worldPosition)
     {
         Vector3 offset = worldPosition - CameraCenterXZ();
-        float pixelsPerUnit = rawImageRect.rect.width / (minimapCamera.orthographicSize * 2f);
+        float worldSpan = minimapCamera.orthographicSize * 2f;
+        float pixelsPerUnitX = rawImageRect.rect.width / worldSpan;
+        float pixelsPerUnitY = rawImageRect.rect.height / worldSpan;
 
         // 攝影機是 (90,0,0) 的俯視角度：世界 X 對應小地圖本地 X，世界 Z 對應小地圖本地 Y
-        return new Vector2(offset.x, offset.z) * pixelsPerUnit;
+        return new Vector2(offset.x * pixelsPerUnitX, offset.z * pixelsPerUnitY);
     }
 
     /// <summary>
@@ -249,8 +256,12 @@ public class MinimapController : MonoBehaviour, IPointerClickHandler
 
         if (!inside) return;
 
-        float pixelsPerUnit = sourceRect.rect.width / (minimapCamera.orthographicSize * 2f);
-        Vector3 worldOffset = new Vector3(localPoint.x / pixelsPerUnit, 0f, localPoint.y / pixelsPerUnit);
+        // 跟 WorldToMinimapLocal 對稱：面板不一定是正方形，X/Y 的換算比例要分開算，
+        // 不然點擊面板上下邊緣時，換算出來的世界座標會被壓縮、往中心偏移。
+        float worldSpan = minimapCamera.orthographicSize * 2f;
+        float pixelsPerUnitX = sourceRect.rect.width / worldSpan;
+        float pixelsPerUnitY = sourceRect.rect.height / worldSpan;
+        Vector3 worldOffset = new Vector3(localPoint.x / pixelsPerUnitX, 0f, localPoint.y / pixelsPerUnitY);
         Vector3 clickedWorldXZ = CameraCenterXZ() + worldOffset;
 
         float groundY = FindGroundHeight(clickedWorldXZ, player.position.y);
