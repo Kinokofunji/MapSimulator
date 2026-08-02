@@ -8,7 +8,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 9fc0d4010bbf28b4594072e72b8655ab
-  - enabled: 1
+  - enabled: 0
     path: Assets/CitySimulator/CitySimulator.unity
     guid: 9dea71602898d0e489dc386bf97890fc
   - enabled: 1
