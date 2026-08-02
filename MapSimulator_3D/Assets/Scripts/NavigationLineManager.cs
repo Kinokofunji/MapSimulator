@@ -58,6 +58,13 @@ public class NavigationLineManager : MonoBehaviour
     [Tooltip("玩家與節點距離小於此值，視為已經抵達該路口節點")]
     public float arrivalThreshold = 5f;
 
+    [Header("錯過路口自動重新導航")]
+    [Tooltip("勾選後，如果玩家開過頭錯過目前的轉彎路口，會自動跳到最接近的後續路口，模擬 Google 導航即時重新規劃")]
+    public bool autoRerouteOnMissedTurn = true;
+
+    [Tooltip("玩家與目前路口距離超過這個值，且後面剛好有更近的路口時，視為已經錯過這個路口")]
+    public float missedTurnDistance = 40f;
+
     // 目前玩家已經走到的路口節點索引 (0 = 第一個節點)
     public int CurrentWaypointIndex { get; private set; } = 0;
 
@@ -72,6 +79,9 @@ public class NavigationLineManager : MonoBehaviour
 
     /// <summary>當玩家抵達最後一個節點 (終點) 時觸發一次</summary>
     public event Action OnDestinationReached;
+
+    /// <summary>當偵測到玩家錯過路口、自動跳到新的節點時觸發，參數為「新的」目前節點索引</summary>
+    public event Action<int> OnRouteRecalculated;
 
     private LineRenderer lineRenderer;
 
@@ -92,6 +102,11 @@ public class NavigationLineManager : MonoBehaviour
         if (player != null && !IsDestinationReached)
         {
             CheckWaypointProgress();
+
+            if (autoRerouteOnMissedTurn && !IsDestinationReached)
+            {
+                CheckForMissedTurn();
+            }
         }
 
         // 已經抵達終點，導航線就不再需要顯示
@@ -156,6 +171,40 @@ public class NavigationLineManager : MonoBehaviour
                     DrawLine();
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// 沒有真正的道路網資料可以判斷「走錯路」，所以用一個簡單但實用的近似法：
+    /// 如果玩家離目前路口已經明顯變遠 (超過 missedTurnDistance)，
+    /// 而後續某個路口反而比目前路口更近，就視為已經開過頭、錯過轉彎，
+    /// 直接把目前節點跳到那個「玩家離它最近」的後續路口，並重新畫線，模擬即時重新導航。
+    /// </summary>
+    private void CheckForMissedTurn()
+    {
+        if (CurrentWaypointIndex >= waypoints.Count - 1) return; // 已經是最後一個節點，沒有下一個可以跳
+
+        float distanceToCurrent = Vector3.Distance(player.position, CurrentWaypoint.position);
+        if (distanceToCurrent <= missedTurnDistance) return; // 還沒明顯開過頭，不用處理
+
+        int closestIndex = CurrentWaypointIndex;
+        float closestDistance = distanceToCurrent;
+
+        for (int i = CurrentWaypointIndex + 1; i < waypoints.Count; i++)
+        {
+            float distance = Vector3.Distance(player.position, waypoints[i].position);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestIndex = i;
+            }
+        }
+
+        if (closestIndex > CurrentWaypointIndex)
+        {
+            CurrentWaypointIndex = closestIndex;
+            OnRouteRecalculated?.Invoke(CurrentWaypointIndex);
+            DrawLine();
         }
     }
 

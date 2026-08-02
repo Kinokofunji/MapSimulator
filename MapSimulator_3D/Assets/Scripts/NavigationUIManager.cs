@@ -41,15 +41,26 @@ public class NavigationUIManager : MonoBehaviour
 
     // 記錄上一次顯示的節點索引，避免每一影格都重複設定圖示/文字
     private int lastDisplayedIndex = -1;
+    private bool loggedMissingReference = false;
 
     void Update()
     {
-        if (lineManager == null || player == null) return;
+        if (lineManager == null || player == null)
+        {
+            if (!loggedMissingReference)
+            {
+                loggedMissingReference = true;
+                Debug.LogWarning(
+                    $"NavigationUIManager：Line Manager 或 Player 欄位是空的 (lineManager={(lineManager == null ? "null" : "OK")}, " +
+                    $"player={(player == null ? "null" : "OK")})，卡片邏輯完全不會執行。");
+            }
+            return;
+        }
 
         // 已經抵達終點，或沒有任何節點資料，就直接隱藏卡片
         if (lineManager.IsDestinationReached || lineManager.CurrentWaypoint == null)
         {
-            SetCardVisible(false);
+            SetCardVisible(false, lineManager.IsDestinationReached ? "已抵達終點" : "目前沒有任何路線節點 (waypoints 是空的)");
             return;
         }
 
@@ -58,12 +69,12 @@ public class NavigationUIManager : MonoBehaviour
 
         if (distance <= displayDistance)
         {
-            SetCardVisible(true);
+            SetCardVisible(true, $"距離目前節點 {distance:0.0}m，在顯示門檻 {displayDistance}m 內");
             UpdateCardContent(currentWaypoint, distance);
         }
         else
         {
-            SetCardVisible(false);
+            SetCardVisible(false, $"距離目前節點 {distance:0.0}m，超過顯示門檻 {displayDistance}m");
             lastDisplayedIndex = -1; // 離開顯示範圍後重置，下次進入範圍會重新刷新內容
         }
     }
@@ -165,10 +176,18 @@ public class NavigationUIManager : MonoBehaviour
         return $"{rounded} m";
     }
 
-    private void SetCardVisible(bool visible)
+    private void SetCardVisible(bool visible, string reason = null)
     {
-        if (turnCardPanel != null && turnCardPanel.activeSelf != visible)
+        if (turnCardPanel == null)
         {
+            Debug.LogWarning("NavigationUIManager：Turn Card Panel 欄位是空的，卡片無法顯示/隱藏。");
+            return;
+        }
+
+        if (turnCardPanel.activeSelf != visible)
+        {
+            // 用 LogWarning 而不是 Log，確保就算 Console 的 Info 訊息顯示開關被關掉，這則診斷訊息也一定看得到
+            Debug.LogWarning($"NavigationUIManager：卡片切換為 {(visible ? "顯示" : "隱藏")}" + (reason != null ? $"（{reason}）" : ""));
             turnCardPanel.SetActive(visible);
         }
     }
