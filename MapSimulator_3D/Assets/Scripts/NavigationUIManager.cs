@@ -39,9 +39,30 @@ public class NavigationUIManager : MonoBehaviour
     [Tooltip("玩家與下一個路口距離小於此值時，才顯示指引卡片")]
     public float displayDistance = 150f;
 
+    [Header("取消導航")]
+    [Tooltip("卡片上的取消導航按鈕（選填）。按下後會清空目前路線，卡片跟導航線會一起消失")]
+    public Button cancelButton;
+
     // 記錄上一次顯示的節點索引，避免每一影格都重複設定圖示/文字
     private int lastDisplayedIndex = -1;
     private bool loggedMissingReference = false;
+
+    void Awake()
+    {
+        if (cancelButton != null)
+        {
+            cancelButton.onClick.AddListener(CancelNavigation);
+        }
+    }
+
+    /// <summary>按下取消導航按鈕時呼叫：清空路線，卡片會在下一影格的 Update() 自動隱藏。</summary>
+    public void CancelNavigation()
+    {
+        if (lineManager != null)
+        {
+            lineManager.CancelNavigation();
+        }
+    }
 
     void Update()
     {

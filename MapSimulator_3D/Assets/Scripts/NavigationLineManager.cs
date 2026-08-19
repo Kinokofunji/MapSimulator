@@ -220,6 +220,17 @@ public class NavigationLineManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 取消目前的導航：清空所有路線節點、隱藏導航線，UI 卡片下一影格也會跟著自動隱藏。
+    /// </summary>
+    public void CancelNavigation()
+    {
+        waypoints = new List<NavWaypoint>();
+        CurrentWaypointIndex = 0;
+        IsDestinationReached = false;
+        HideLine();
+    }
+
+    /// <summary>
     /// 保留目前的 waypoints 路線內容，只把「玩家已經走到哪個節點」的進度重置回第一個節點。
     /// 用於車輛被傳送回起點時（例如卡死重置、掉出地圖重置），避免導航進度跟車輛實際位置對不上。
     /// </summary>

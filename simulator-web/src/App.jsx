@@ -61,7 +61,7 @@ function App() {
               border: '1px solid rgba(255, 255, 255, 0.5)', // 白色細邊框
               borderRadius: '6px',
             }}>
-              進入VR
+              進入實景平台
             </button>
 
             {/* 按鈕二 */}
@@ -87,7 +87,7 @@ function App() {
               border: '1px solid rgba(255, 255, 255, 0.5)',
               borderRadius: '6px',
             }}>
-              開發團隊 👥
+              進入外送模式 👥
             </button>
 
           </div>

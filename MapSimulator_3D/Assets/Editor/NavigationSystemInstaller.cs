@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -84,10 +86,11 @@ public static class NavigationSystemInstaller
             $"・已順便停用 {disabledFaderCount} 個 UIFadeController，避免 HUD 被自動淡出關閉\n" +
             "・HudVisibilityGuard：每次進 Play 模式一開始就會再次強制停用 UIFadeController，就算之前是在 Play 模式底下跑安裝腳本、Editor 端的停用被 Unity 復原了也沒關係\n" +
             "・修正全景地圖按 M 鍵無法重複收合的 bug\n" +
+            "・小地圖的玩家箭頭/目的地標記換成程式產生的箭頭/圖釘圖示（Assets/Textures/），不再是純色方塊\n" +
+            "・轉彎卡片右上角新增「X」取消導航按鈕，按下會清空目前路線\n" +
             fontNote + "\n" +
             "還需要你手動完成：\n" +
-            "1. 小地圖上的玩家箭頭/目的地標記目前是純色方塊，可以到 MinimapPanel 底下的 PlayerArrow / DestinationMarker 換成美術 Sprite\n" +
-            "2. 確認無誤後記得存檔 (Ctrl+S)\n\n" +
+            "1. 確認無誤後記得存檔 (Ctrl+S)\n\n" +
             "注意：道路網格路線是用場景裡道路方磚的排列位置反推出來的近似連通關係，不是真正理解每塊方磚開口方向的精準道路圖，" +
             "在少數轉角/T字路口可能出現不完全貼合的轉彎，屬於已知限制。\n\n" +
             "這次也在 NavigationUIManager 加了除錯訊息，Play 模式測試時 Console 會即時顯示卡片顯示/隱藏的原因（例如距離多遠），" +
@@ -113,6 +116,44 @@ public static class NavigationSystemInstaller
             "對應的 CanvasGroup alpha 已還原為 1、物件已確保為 Active。\n" +
             "記得存檔 (Ctrl+S)。",
             "確定");
+    }
+
+    // 已經確認裝好整套導航系統、也實際測試過可以動的場景。
+    // 專案裡另外還有一個 CitySimulator.unity，內容跟這個場景很像，但完全沒裝過導航系統，
+    // 之前就是因為 Build Settings 把 CitySimulator.unity 排在第一個（開機優先載入），
+    // 才會發生「WebGL 建置好好的，但畫面沒有小地圖」的狀況。
+    private const string CanonicalScenePath =
+        "Assets/SimplePoly City - Low Poly Assets/Demo/SimplePoly City - Low Poly Assets_Demo Scene.unity";
+
+    /// <summary>
+    /// 整理 Build Settings：把已經確認裝好導航系統的場景設成唯一啟用、且排第一個的場景，
+    /// 其他場景保留在清單裡但停用（不會刪除任何場景檔案，之後隨時可以在 Build Settings 視窗裡重新勾選）。
+    /// </summary>
+    [MenuItem("Tools/導航系統/整理 Build Settings（只啟用已裝導航系統的場景）")]
+    public static void ConsolidateBuildScenes()
+    {
+        EditorBuildSettingsScene[] existing = EditorBuildSettings.scenes;
+
+        var newScenes = new List<EditorBuildSettingsScene>
+        {
+            new EditorBuildSettingsScene(CanonicalScenePath, true)
+        };
+
+        foreach (EditorBuildSettingsScene scene in existing)
+        {
+            if (scene.path == CanonicalScenePath) continue;
+            newScenes.Add(new EditorBuildSettingsScene(scene.path, false));
+        }
+
+        EditorBuildSettings.scenes = newScenes.ToArray();
+
+        EditorUtility.DisplayDialog(
+            "完成",
+            $"Build Settings 已整理：\n\n" +
+            $"・{CanonicalScenePath}\n  現在是第一個、且是唯一啟用的場景，WebGL 建置開機會載入它\n\n" +
+            "・其他場景保留在清單中，但已停用（沒有刪除任何檔案，之後要用隨時可以在 Build Settings 視窗裡重新勾選）\n\n" +
+            "這是 Editor 端的設定變更，不需要存場景，但下次 Build WebGL 前建議打開 File → Build Settings 眼睛看一下確認清單正確。",
+            "了解");
     }
 
     /// <summary>
@@ -370,6 +411,7 @@ public static class NavigationSystemInstaller
         Transform destT = panelObj.transform.Find("DestinationMarker");
         if (arrowT != null) controller.playerArrow = arrowT.GetComponent<RectTransform>();
         if (destT != null) controller.destinationMarker = destT.GetComponent<RectTransform>();
+        ApplyMinimapIcons(arrowT, destT);
 
         // 全景地圖：跟小地圖共用同一台攝影機/RenderTexture，展開時佔滿畫面
         Transform existingFullMap = canvas.transform.Find("FullMapPanel");
@@ -513,9 +555,8 @@ public static class NavigationSystemInstaller
         arrowRect.anchorMin = new Vector2(0.5f, 0.5f);
         arrowRect.anchorMax = new Vector2(0.5f, 0.5f);
         arrowRect.pivot = new Vector2(0.5f, 0.5f);
-        arrowRect.sizeDelta = new Vector2(20, 20);
+        arrowRect.sizeDelta = new Vector2(28, 28);
         arrowRect.anchoredPosition = Vector2.zero;
-        // 先用顯眼的黃色方塊代表玩家方向，之後可以到 PlayerArrow 換成箭頭 Sprite
         arrowObj.GetComponent<Image>().color = new Color(1f, 0.85f, 0f, 1f);
 
         GameObject destObj = new GameObject("DestinationMarker", typeof(RectTransform), typeof(Image));
@@ -523,13 +564,143 @@ public static class NavigationSystemInstaller
         RectTransform destRect = destObj.GetComponent<RectTransform>();
         destRect.anchorMin = new Vector2(0.5f, 0.5f);
         destRect.anchorMax = new Vector2(0.5f, 0.5f);
-        destRect.pivot = new Vector2(0.5f, 0.5f);
-        destRect.sizeDelta = new Vector2(16, 16);
-        // 先用紅色方塊代表目的地，之後可以到 DestinationMarker 換成圖釘 Sprite
+        destRect.pivot = new Vector2(0.5f, 1f); // pivot 對齊圖釘的尖端，這樣標記位置才會對準實際座標
+        destRect.sizeDelta = new Vector2(22, 28);
         destObj.GetComponent<Image>().color = new Color(0.9f, 0.15f, 0.15f, 1f);
         destObj.SetActive(false);
 
         return panel;
+    }
+
+    /// <summary>
+    /// 幫玩家箭頭/目的地標記套用程式產生的 Sprite。
+    /// 特意獨立成一個「不管物件是不是這次新建的都會執行」的步驟——如果只寫在 CreateMinimapPanel 裡，
+    /// 場景裡已經有 MinimapPanel（例如上一版安裝腳本建立的）時就不會重新執行 CreateMinimapPanel，
+    /// 新加的圖示也就永遠套用不上去。
+    /// </summary>
+    private static void ApplyMinimapIcons(Transform arrowT, Transform destT)
+    {
+        if (arrowT != null)
+        {
+            Image arrowImage = arrowT.GetComponent<Image>();
+            if (arrowImage != null)
+            {
+                arrowImage.sprite = GetOrCreateArrowSprite();
+                arrowImage.preserveAspect = true;
+            }
+        }
+
+        if (destT != null)
+        {
+            Image destImage = destT.GetComponent<Image>();
+            if (destImage != null)
+            {
+                destImage.sprite = GetOrCreatePinSprite();
+                destImage.preserveAspect = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 用程式畫一個朝上的三角形箭頭圖示，存成 PNG + Sprite 資源。
+    /// 如果之前已經產生過就直接沿用，不重複產生。
+    /// </summary>
+    private static Sprite GetOrCreateArrowSprite()
+    {
+        const string path = "Assets/Textures/PlayerArrowIcon.png";
+        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (existing != null) return existing;
+
+        const int size = 64;
+        Vector2 tip = new Vector2(size / 2f, size * 0.92f);
+        Vector2 left = new Vector2(size * 0.12f, size * 0.12f);
+        Vector2 right = new Vector2(size * 0.88f, size * 0.12f);
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                tex.SetPixel(x, y, IsInTriangle(p, tip, left, right) ? Color.white : Color.clear);
+            }
+        }
+        tex.Apply();
+
+        return SaveGeneratedIcon(tex, path);
+    }
+
+    /// <summary>
+    /// 用程式畫一個「地圖圖釘」圖示（圓形 + 下方尖角），存成 PNG + Sprite 資源。
+    /// </summary>
+    private static Sprite GetOrCreatePinSprite()
+    {
+        const string path = "Assets/Textures/DestinationPinIcon.png";
+        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (existing != null) return existing;
+
+        const int size = 64;
+        Vector2 circleCenter = new Vector2(size / 2f, size * 0.68f);
+        float radius = size * 0.28f;
+        Vector2 tip = new Vector2(size / 2f, size * 0.04f);
+        Vector2 left = new Vector2(size * 0.32f, size * 0.46f);
+        Vector2 right = new Vector2(size * 0.68f, size * 0.46f);
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                bool inCircle = Vector2.Distance(p, circleCenter) <= radius;
+                bool inTail = IsInTriangle(p, tip, left, right);
+                tex.SetPixel(x, y, (inCircle || inTail) ? Color.white : Color.clear);
+            }
+        }
+        tex.Apply();
+
+        return SaveGeneratedIcon(tex, path);
+    }
+
+    private static bool IsInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+    {
+        float d1 = TriangleSign(p, a, b);
+        float d2 = TriangleSign(p, b, c);
+        float d3 = TriangleSign(p, c, a);
+
+        bool hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+        bool hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+
+        return !(hasNeg && hasPos);
+    }
+
+    private static float TriangleSign(Vector2 p1, Vector2 p2, Vector2 p3)
+    {
+        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    }
+
+    /// <summary>把產生好的 Texture2D 編碼成 PNG 存到磁碟、匯入成 Sprite，並回傳結果。</summary>
+    private static Sprite SaveGeneratedIcon(Texture2D tex, string assetPath)
+    {
+        string dir = Path.GetDirectoryName(assetPath);
+        if (!string.IsNullOrEmpty(dir) && !AssetDatabase.IsValidFolder(dir))
+        {
+            AssetDatabase.CreateFolder("Assets", Path.GetFileName(dir));
+        }
+
+        File.WriteAllBytes(assetPath, tex.EncodeToPNG());
+        AssetDatabase.ImportAsset(assetPath);
+
+        TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+        if (importer != null)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
     }
 
     private static GameObject CreateFullMapPanel(Transform canvasTransform, RenderTexture rt)
@@ -591,6 +762,10 @@ public static class NavigationSystemInstaller
         if (distanceT != null) uiManager.distanceText = distanceT.GetComponent<TMP_Text>();
         if (roadNameT != null) uiManager.roadNameText = roadNameT.GetComponent<TMP_Text>();
 
+        // 獨立呼叫、不管 TurnCardPanel 是不是這次新建的都會執行——道理跟 ApplyMinimapIcons 一樣，
+        // 場景裡已經有 TurnCardPanel 時就不會重新執行 CreateTurnCardPanel，取消按鈕會漏裝。
+        uiManager.cancelButton = EnsureCancelButton(panelObj);
+
         panelObj.SetActive(false); // 初始隱藏，交由 NavigationUIManager 依距離控制顯示
     }
 
@@ -646,6 +821,46 @@ public static class NavigationSystemInstaller
         roadNameTMP.color = new Color(0.85f, 0.85f, 0.85f, 1f);
         roadNameTMP.alignment = TextAlignmentOptions.Left;
 
+        EnsureCancelButton(panel);
+
         return panel;
+    }
+
+    /// <summary>
+    /// 確保 panel 底下有一個 CancelButton 子物件，沒有的話才建立（冪等：可以重複呼叫）。
+    /// 回傳該按鈕的 Button 元件。
+    /// </summary>
+    private static Button EnsureCancelButton(GameObject panel)
+    {
+        Transform existing = panel.transform.Find("CancelButton");
+        if (existing != null)
+        {
+            return existing.GetComponent<Button>();
+        }
+
+        GameObject cancelObj = new GameObject("CancelButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        cancelObj.transform.SetParent(panel.transform, false);
+        RectTransform cancelRect = cancelObj.GetComponent<RectTransform>();
+        cancelRect.anchorMin = new Vector2(1f, 1f);
+        cancelRect.anchorMax = new Vector2(1f, 1f);
+        cancelRect.pivot = new Vector2(1f, 1f);
+        cancelRect.sizeDelta = new Vector2(32, 32);
+        cancelRect.anchoredPosition = new Vector2(-6, -6);
+        cancelObj.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.15f);
+
+        GameObject cancelLabelObj = new GameObject("Label", typeof(RectTransform));
+        cancelLabelObj.transform.SetParent(cancelObj.transform, false);
+        TextMeshProUGUI cancelLabel = cancelLabelObj.AddComponent<TextMeshProUGUI>();
+        RectTransform cancelLabelRect = cancelLabelObj.GetComponent<RectTransform>();
+        cancelLabelRect.anchorMin = Vector2.zero;
+        cancelLabelRect.anchorMax = Vector2.one;
+        cancelLabelRect.offsetMin = Vector2.zero;
+        cancelLabelRect.offsetMax = Vector2.zero;
+        cancelLabel.text = "X"; // 刻意用純 ASCII 字元，避免預設字體(LiberationSans SDF)不支援特殊符號又跳警告
+        cancelLabel.fontSize = 20;
+        cancelLabel.color = Color.white;
+        cancelLabel.alignment = TextAlignmentOptions.Center;
+
+        return cancelObj.GetComponent<Button>();
     }
 }
