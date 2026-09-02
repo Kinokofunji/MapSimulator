@@ -55,6 +55,7 @@ public static class NavigationSystemInstaller
         RoadGridPathfinder pathfinder = GetOrCreateRoadGridPathfinder();
         MinimapController minimapController = SetupMinimap(canvas, car.transform, lineManager, pathfinder);
         SetupRouteChoice(canvas, car.transform, lineManager, minimapController, pathfinder);
+        SetupDestinationSearch(canvas, minimapController);
 
         // 自動停用 UIFadeController，避免既有 HUD（WASD 提示、轉向文字、速度表...）連同新裝的導航 UI
         // 一起在幾秒後或一開始移動就被淡出關閉
@@ -88,6 +89,7 @@ public static class NavigationSystemInstaller
             "・修正全景地圖按 M 鍵無法重複收合的 bug\n" +
             "・小地圖的玩家箭頭/目的地標記換成程式產生的箭頭/圖釘圖示（Assets/Textures/），不再是純色方塊\n" +
             "・轉彎卡片右上角新增「X」取消導航按鈕，按下會清空目前路線\n" +
+            "・畫面左上角新增目的地搜尋欄：輸入地點名稱（例如「餐廳」），會列出符合的地點，點選或按 Enter 直接開始導航\n" +
             fontNote + "\n" +
             "還需要你手動完成：\n" +
             "1. 確認無誤後記得存檔 (Ctrl+S)\n\n" +
@@ -446,6 +448,8 @@ public static class NavigationSystemInstaller
         routeChoiceManager.lineManager = lineManager;
         routeChoiceManager.player = carTransform;
         routeChoiceManager.routeChoicePanel = panelObj;
+        // 每次安裝都強制覆蓋，避免舊版本裝過的元件卡著舊的序列化預設值不會自動更新。
+        routeChoiceManager.alreadyArrivedDistance = 12f;
 
         routeChoiceManager.routeButtons = new List<Button>();
         for (int i = 0; i < 3; i++)
@@ -516,6 +520,242 @@ public static class NavigationSystemInstaller
         }
 
         panel.SetActive(false);
+        return panel;
+    }
+
+    private static void SetupDestinationSearch(Canvas canvas, MinimapController minimapController)
+    {
+        Transform existingPanel = canvas.transform.Find("SearchPanel");
+        GameObject panelObj;
+        TMP_InputField inputField;
+        GameObject resultsPanelObj;
+        List<Button> resultButtons;
+        List<TextMeshProUGUI> resultLabels;
+
+        if (existingPanel != null)
+        {
+            panelObj = existingPanel.gameObject;
+            inputField = panelObj.GetComponentInChildren<TMP_InputField>(true);
+            Transform resultsT = panelObj.transform.Find("SearchResultsPanel");
+            resultsPanelObj = resultsT != null ? resultsT.gameObject : null;
+            resultButtons = new List<Button>();
+            resultLabels = new List<TextMeshProUGUI>();
+            if (resultsPanelObj != null)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    Transform buttonT = resultsPanelObj.transform.Find($"ResultButton_{i}");
+                    if (buttonT == null) continue;
+                    resultButtons.Add(buttonT.GetComponent<Button>());
+                    Transform labelT = buttonT.Find("Label");
+                    resultLabels.Add(labelT != null ? labelT.GetComponent<TextMeshProUGUI>() : null);
+                }
+            }
+        }
+        else
+        {
+            panelObj = CreateSearchPanel(
+                canvas.transform, out inputField, out resultsPanelObj, out resultButtons, out resultLabels);
+        }
+
+        DestinationSearchController controller = panelObj.GetComponent<DestinationSearchController>();
+        if (controller == null)
+        {
+            controller = panelObj.AddComponent<DestinationSearchController>();
+        }
+
+        controller.minimapController = minimapController;
+        controller.searchInput = inputField;
+        controller.resultsPanel = resultsPanelObj;
+        controller.resultButtons = resultButtons;
+        controller.resultLabels = resultLabels;
+
+        // 獨立呼叫、不管 SearchPanel 是不是這次新建的都會執行——道理跟 ApplyMinimapIcons、
+        // EnsureCancelButton 一樣：場景裡已經有 SearchPanel 時就不會重新執行
+        // CreateSearchPanel，尺寸/字體大小的調整永遠套用不上去。
+        ApplySearchPanelStyle(panelObj, inputField, resultsPanelObj, resultButtons, resultLabels);
+    }
+
+    /// <summary>
+    /// 搜尋欄跟結果清單的尺寸/字體大小統一在這裡設定，每次安裝都強制覆蓋，
+    /// 確保不管場景之前裝的是哪一版尺寸，都會更新成最新的數值。
+    /// </summary>
+    private static void ApplySearchPanelStyle(
+        GameObject panelObj, TMP_InputField inputField, GameObject resultsPanelObj,
+        List<Button> resultButtons, List<TextMeshProUGUI> resultLabels)
+    {
+        const float panelWidth = 380f;
+        const float inputHeight = 60f;
+        const float inputFontSize = 28f;
+        const float rowHeight = 48f;
+        const float rowFontSize = 24f;
+
+        RectTransform panelRect = panelObj.GetComponent<RectTransform>();
+        if (panelRect != null)
+        {
+            panelRect.sizeDelta = new Vector2(panelWidth, inputHeight);
+        }
+
+        if (inputField != null)
+        {
+            if (inputField.textComponent != null)
+            {
+                inputField.textComponent.fontSize = inputFontSize;
+            }
+
+            if (inputField.placeholder is TextMeshProUGUI placeholderTmp)
+            {
+                placeholderTmp.fontSize = inputFontSize;
+            }
+        }
+
+        if (resultsPanelObj != null)
+        {
+            RectTransform resultsRect = resultsPanelObj.GetComponent<RectTransform>();
+            if (resultsRect != null)
+            {
+                resultsRect.sizeDelta = new Vector2(0, resultButtons.Count * rowHeight);
+            }
+        }
+
+        for (int i = 0; i < resultButtons.Count; i++)
+        {
+            if (resultButtons[i] == null) continue;
+
+            RectTransform buttonRect = resultButtons[i].GetComponent<RectTransform>();
+            if (buttonRect != null)
+            {
+                buttonRect.sizeDelta = new Vector2(0, rowHeight - 2);
+                buttonRect.anchoredPosition = new Vector2(0, -i * rowHeight);
+            }
+
+            if (i < resultLabels.Count && resultLabels[i] != null)
+            {
+                resultLabels[i].fontSize = rowFontSize;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 建立目的地搜尋欄：畫面左上角一個輸入框，下方是符合搜尋文字的地點清單（預設隱藏，
+    /// 有輸入文字且找到符合的地點才展開）。位置刻意選左上角——上方置中是轉彎卡片
+    /// （TurnCardPanel），右上角是小地圖（MinimapPanel），左上角是唯一還空著的角落。
+    /// </summary>
+    private static GameObject CreateSearchPanel(
+        Transform canvasTransform, out TMP_InputField inputField, out GameObject resultsPanel,
+        out List<Button> resultButtons, out List<TextMeshProUGUI> resultLabels)
+    {
+        GameObject panel = new GameObject("SearchPanel", typeof(RectTransform));
+        panel.transform.SetParent(canvasTransform, false);
+
+        RectTransform panelRect = panel.GetComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0f, 1f);
+        panelRect.anchorMax = new Vector2(0f, 1f);
+        panelRect.pivot = new Vector2(0f, 1f);
+        panelRect.sizeDelta = new Vector2(380, 60); // 實際數值以 ApplySearchPanelStyle 為準，這裡只是初始值
+        panelRect.anchoredPosition = new Vector2(20, -20);
+
+        GameObject inputObj = new GameObject(
+            "SearchInputField", typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
+        inputObj.transform.SetParent(panel.transform, false);
+        RectTransform inputRect = inputObj.GetComponent<RectTransform>();
+        inputRect.anchorMin = Vector2.zero;
+        inputRect.anchorMax = Vector2.one;
+        inputRect.offsetMin = Vector2.zero;
+        inputRect.offsetMax = Vector2.zero;
+        inputObj.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.9f);
+
+        inputField = inputObj.GetComponent<TMP_InputField>();
+
+        GameObject textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+        textArea.transform.SetParent(inputObj.transform, false);
+        RectTransform textAreaRect = textArea.GetComponent<RectTransform>();
+        textAreaRect.anchorMin = Vector2.zero;
+        textAreaRect.anchorMax = Vector2.one;
+        textAreaRect.offsetMin = new Vector2(10, 6);
+        textAreaRect.offsetMax = new Vector2(-10, -6);
+
+        GameObject placeholderObj = new GameObject("Placeholder", typeof(RectTransform));
+        placeholderObj.transform.SetParent(textArea.transform, false);
+        TextMeshProUGUI placeholder = placeholderObj.AddComponent<TextMeshProUGUI>();
+        RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
+        placeholderRect.anchorMin = Vector2.zero;
+        placeholderRect.anchorMax = Vector2.one;
+        placeholderRect.offsetMin = Vector2.zero;
+        placeholderRect.offsetMax = Vector2.zero;
+        placeholder.text = "搜尋地點名稱...";
+        placeholder.fontSize = 28;
+        placeholder.fontStyle = FontStyles.Italic;
+        placeholder.color = new Color(0f, 0f, 0f, 0.5f);
+        placeholder.alignment = TextAlignmentOptions.MidlineLeft;
+
+        GameObject textObj = new GameObject("Text", typeof(RectTransform));
+        textObj.transform.SetParent(textArea.transform, false);
+        TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        text.fontSize = 28;
+        text.color = Color.black;
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+
+        inputField.textViewport = textAreaRect;
+        inputField.textComponent = text;
+        inputField.placeholder = placeholder;
+        inputField.lineType = TMP_InputField.LineType.SingleLine;
+
+        const int maxRows = 5;
+        const float rowHeight = 48f; // 實際數值以 ApplySearchPanelStyle 為準，這裡只是初始值
+
+        resultsPanel = new GameObject("SearchResultsPanel", typeof(RectTransform), typeof(Image));
+        resultsPanel.transform.SetParent(panel.transform, false);
+        RectTransform resultsRect = resultsPanel.GetComponent<RectTransform>();
+        resultsRect.anchorMin = new Vector2(0f, 0f);
+        resultsRect.anchorMax = new Vector2(1f, 0f);
+        resultsRect.pivot = new Vector2(0.5f, 1f);
+        resultsRect.anchoredPosition = new Vector2(0, -4);
+        resultsRect.sizeDelta = new Vector2(0, maxRows * rowHeight);
+        resultsPanel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.85f);
+
+        resultButtons = new List<Button>();
+        resultLabels = new List<TextMeshProUGUI>();
+
+        for (int i = 0; i < maxRows; i++)
+        {
+            GameObject buttonObj = new GameObject($"ResultButton_{i}", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObj.transform.SetParent(resultsPanel.transform, false);
+
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            buttonRect.anchorMin = new Vector2(0f, 1f);
+            buttonRect.anchorMax = new Vector2(1f, 1f);
+            buttonRect.pivot = new Vector2(0.5f, 1f);
+            buttonRect.sizeDelta = new Vector2(0, rowHeight - 2);
+            buttonRect.anchoredPosition = new Vector2(0, -i * rowHeight);
+
+            buttonObj.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
+
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform));
+            labelObj.transform.SetParent(buttonObj.transform, false);
+            TextMeshProUGUI label = labelObj.AddComponent<TextMeshProUGUI>();
+            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(10, 0);
+            labelRect.offsetMax = new Vector2(-10, 0);
+            label.text = "";
+            label.fontSize = 24;
+            label.color = Color.white;
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+
+            resultButtons.Add(buttonObj.GetComponent<Button>());
+            resultLabels.Add(label);
+            buttonObj.SetActive(false);
+        }
+
+        resultsPanel.SetActive(false);
+
         return panel;
     }
 

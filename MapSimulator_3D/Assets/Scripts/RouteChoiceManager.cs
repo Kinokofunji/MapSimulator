@@ -29,6 +29,11 @@ public class RouteChoiceManager : MonoBehaviour
     [Tooltip("候選路線抬高的高度")]
     public float previewHeightOffset = 1.5f;
 
+    [Tooltip("玩家目前位置離目的地小於這個距離，視為已經在目的地附近，不需要規劃路線。" +
+             "數值要比 RoadGridPathfinder 最後停靠時「最多再靠近半個格子」的距離還大，" +
+             "否則車輛可能剛好停在門檻外一點點，重新導航到同一個地方時又觸發一次規劃")]
+    public float alreadyArrivedDistance = 12f;
+
     [Header("候選路線點選 UI")]
     [Tooltip("包住路線選擇按鈕的面板，規劃出路線時顯示、選好後自動隱藏")]
     public GameObject routeChoicePanel;
@@ -77,8 +82,12 @@ public class RouteChoiceManager : MonoBehaviour
         return lr;
     }
 
-    /// <summary>規劃到某個目的地的多條候選路線，並顯示出來讓玩家挑選。</summary>
-    public void RequestRoutes(Vector3 destination)
+    /// <summary>
+    /// 規劃到某個目的地的多條候選路線，並顯示出來讓玩家挑選。
+    /// destinationBounds 選填：目的地對應的實際外觀邊界（例如搜尋到的建築物），有提供的話
+    /// 轉給 RoadGridPathfinder 讓最後停靠點精準停在邊界表面，不會開進建築物內部。
+    /// </summary>
+    public void RequestRoutes(Vector3 destination, Bounds? destinationBounds = null)
     {
         if (pathfinder == null || player == null)
         {
@@ -86,7 +95,18 @@ public class RouteChoiceManager : MonoBehaviour
             return;
         }
 
-        currentRoutes = pathfinder.FindMultipleRoutes(player.position, destination, maxRouteChoices);
+        // 車輛已經幾乎站在目的地時（例如剛導航到某家店、又重新選同一家店），
+        // 起點/終點很容易被吸附到同一個道路格子，算出來的路徑會退化成只有一個點；
+        // 再加上會補上精確門口座標，就會變成「先跳到格子中心、再繞回幾乎原地」這種
+        // 不必要的小繞路，看起來像是奇怪的導航指示。已經夠近就直接視為抵達，不規劃路線。
+        if (Vector3.Distance(player.position, destination) < alreadyArrivedDistance)
+        {
+            Debug.Log("RouteChoiceManager：目前位置已經在目的地附近，不需要規劃路線。");
+            HideChoices();
+            return;
+        }
+
+        currentRoutes = pathfinder.FindMultipleRoutes(player.position, destination, maxRouteChoices, destinationBounds);
 
         if (currentRoutes.Count == 0)
         {

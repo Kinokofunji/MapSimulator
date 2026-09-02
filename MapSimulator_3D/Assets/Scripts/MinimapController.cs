@@ -292,12 +292,17 @@ public class MinimapController : MonoBehaviour, IPointerClickHandler
     /// 設定新的導航目的地。
     /// 如果有指定 RouteChoiceManager，會規劃多條沿實際道路網格走的候選路線讓玩家挑選；
     /// 沒有指定的話，退回成「車輛 -> 目的地」的單一節點直線路徑。
+    ///
+    /// destinationBounds 是選填的目的地實際外觀邊界（例如搜尋建築物時，DestinationSearchController
+    /// 會帶入該建築物的邊界框）：有提供的話，最後停靠點會沿著路網終點朝目的地方向前進到
+    /// 邊界表面，不會真的開進建築物內部；地圖點擊這種沒有對應實體邊界的任意座標則不傳，
+    /// 沿用原本「最多再靠近半格路網」的保守做法。
     /// </summary>
-    public void SetDestination(Vector3 destination)
+    public void SetDestination(Vector3 destination, Bounds? destinationBounds = null)
     {
         if (routeChoiceManager != null)
         {
-            routeChoiceManager.RequestRoutes(destination);
+            routeChoiceManager.RequestRoutes(destination, destinationBounds);
             return;
         }
 

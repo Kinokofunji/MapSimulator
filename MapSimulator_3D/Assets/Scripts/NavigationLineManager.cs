@@ -83,6 +83,13 @@ public class NavigationLineManager : MonoBehaviour
     /// <summary>當偵測到玩家錯過路口、自動跳到新的節點時觸發，參數為「新的」目前節點索引</summary>
     public event Action<int> OnRouteRecalculated;
 
+    /// <summary>
+    /// 整條路線被取代或取消時觸發（SetRoute / CancelNavigation），帶出「新的」完整 waypoints 清單
+    /// （取消時是空清單，不是 null）。給外部系統（例如 NavigationCoreVehicleBridge）訂閱，
+    /// 不用每影格用輪詢的方式檢查路線有沒有變。
+    /// </summary>
+    public event Action<List<NavWaypoint>> OnRouteChanged;
+
     private LineRenderer lineRenderer;
 
     void Awake()
@@ -217,6 +224,7 @@ public class NavigationLineManager : MonoBehaviour
         CurrentWaypointIndex = 0;
         IsDestinationReached = false;
         DrawLine();
+        OnRouteChanged?.Invoke(waypoints);
     }
 
     /// <summary>
@@ -228,6 +236,7 @@ public class NavigationLineManager : MonoBehaviour
         CurrentWaypointIndex = 0;
         IsDestinationReached = false;
         HideLine();
+        OnRouteChanged?.Invoke(waypoints);
     }
 
     /// <summary>

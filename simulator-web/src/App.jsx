@@ -78,17 +78,24 @@ function App() {
             </button>
 
             {/* 按鈕三 */}
-            <button style={{
-              padding: '10px 20px',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.5)',
-              borderRadius: '6px',
-            }}>
+            <a
+              href="https://pod-venomous-wikipedia.ngrok-free.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: '10px 20px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                display: 'inline-block',
+              }}
+            >
               進入外送模式 👥
-            </button>
+            </a>
 
           </div>
         </div>
