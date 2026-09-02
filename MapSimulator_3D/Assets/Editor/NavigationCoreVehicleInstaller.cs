@@ -68,8 +68,8 @@ public static class NavigationCoreVehicleInstaller
         Navigation.NavigationLineManager bridgeLineManager = SetupBridgeLineManager(car.transform);
         RoadGridPathfinder pathfinder = Object.FindObjectOfType<RoadGridPathfinder>();
         Navigation.AutoDriveController autoDrive = SetupAutoDrive(vehicleObject, bridgeLineManager, pathfinder);
-        SetupDriveModeSwitcher(vehicleObject, physicsController, autoDrive);
-        SetupBridge(vehicleObject, ourLineManager, bridgeLineManager);
+        Navigation.DriveModeSwitcher driveModeSwitcher = SetupDriveModeSwitcher(vehicleObject, physicsController, autoDrive);
+        SetupBridge(vehicleObject, ourLineManager, bridgeLineManager, driveModeSwitcher);
         SetupSpeedometerBridge(car, vehicleObject);
 
         if (vehicleObject.GetComponent<VehicleUprightStabilizer>() == null)
@@ -105,6 +105,9 @@ public static class NavigationCoreVehicleInstaller
             "・自動駕駛貼地邏輯改用 AutoDriveGroundFollow（進自動駕駛當下即時量測正確的離地高度），修正路徑上方有障礙物時車輛會飛越過去的問題\n" +
             "・新增 AutoDriveObstacleAvoidance：自動駕駛時偵測正前方障礙物會平滑往左右閃避，不再直接穿模過去（純粹是視覺上的側閃修正，不是真正的路徑重新規劃）\n" +
             "・閃避方向改為優先挑選離真實道路網格較近的一側，避免轉向時開上人行道/空地\n" +
+            "・目的地「最後停靠精準點」改成優先偵測人行道方塊：沿路只要會先碰到人行道，就停在人行道前面，不會為了貼近建築物邊界而直接壓過人行道\n" +
+            "・修正閃避距離計算：改成把障礙物邊界框投影到車身的側向/車頭方向分別計算寬度和長度，不再對又長又窄、順著馬路停的障礙物（卡車、公車）誤把長度當寬度，導致算出的側閃距離超出馬路範圍、車輛卡住磨蹭\n" +
+            "・NavigationCoreVehicleBridge 新增抵達終點自動切回手動駕駛：修正之前導航明明已經走到終點附近、畫面上的線也消失了，車輛卻還會自己繼續開一段的問題\n" +
             "・CarResetController 新增「翻覆自動原地扶正」：側翻超過角度門檻並持續一段時間會自動扶正，不會傳送回起點、不影響導航進度\n" +
             "・時速表改由 SpeedometerBridge 接手更新（沿用原本的 speedText，CarController 停用後不會再壞掉顯示）\n\n" +
             "測試前記得：\n" +
@@ -752,7 +755,7 @@ public static class NavigationCoreVehicleInstaller
         return autoDrive;
     }
 
-    private static void SetupDriveModeSwitcher(
+    private static Navigation.DriveModeSwitcher SetupDriveModeSwitcher(
         GameObject vehicleObject, Navigation.VehiclePhysicsController manualController, Navigation.AutoDriveController autoController)
     {
         Navigation.DriveModeSwitcher switcher = vehicleObject.GetComponent<Navigation.DriveModeSwitcher>();
@@ -771,10 +774,13 @@ public static class NavigationCoreVehicleInstaller
         // 我們的地圖是一次載入、不是串流地形，用不到，開著反而會讓車輛開場多凍結最多 8 秒。
         so.FindProperty("snapToGroundOnStart").boolValue = false;
         so.ApplyModifiedProperties();
+
+        return switcher;
     }
 
     private static void SetupBridge(
-        GameObject vehicleObject, NavigationLineManager ourLineManager, Navigation.NavigationLineManager bridgeLineManager)
+        GameObject vehicleObject, NavigationLineManager ourLineManager, Navigation.NavigationLineManager bridgeLineManager,
+        Navigation.DriveModeSwitcher driveModeSwitcher)
     {
         NavigationCoreVehicleBridge bridge = vehicleObject.GetComponent<NavigationCoreVehicleBridge>();
         if (bridge == null)
@@ -784,6 +790,7 @@ public static class NavigationCoreVehicleInstaller
 
         bridge.sourceLineManager = ourLineManager;
         bridge.targetLineManager = bridgeLineManager;
+        bridge.driveModeSwitcher = driveModeSwitcher;
     }
 
     /// <summary>

@@ -286,13 +286,24 @@ public class AutoDriveObstacleAvoidance : MonoBehaviour
         // 固定的側移/前進距離對小型障礙物（停放車輛，寬度約 2 公尺）夠用，但對建築物
         // 這種龐然大物（實測寬度/深度可以到十幾公尺）完全不夠——閃避目標點還是會落在
         // 建築物範圍內，車輛只是稍微挪動一下，很快又貼著同一棟建築物被重新偵測到。
-        // 改成依碰撞體實際邊界大小動態放大：取邊界裡最大的尺寸當作「這個障礙物大概
-        // 多大」的估計值，用它的一半再加上基本安全距離，確保閃避目標點真的能落在
-        // 障礙物範圍之外，不管是小車還是一整棟樓都適用。
+        // 改成依碰撞體實際邊界大小動態放大，確保閃避目標點真的能落在障礙物範圍之外，
+        // 不管是小車還是一整棟樓都適用。
+        //
+        // 一開始直接取邊界框三個世界座標軸尺寸的最大值，同時當作「側向要閃多寬」跟
+        // 「前後要看多遠」——遇到又長又窄、剛好順著馬路停的障礙物（例如卡車、公車，
+        // 車身長軸跟行進方向差不多平行，這其實是最常見的情況，障礙物本來就是「擋在
+        // 同一條路上」）就會出錯：長度被誤當成寬度，側閃距離被放大到超過馬路本身的
+        // 寬度，兩側候選點都閃到路外，車輛找不到真正閃得過去的點，只能一直貼著障礙物
+        // 卡住、來回頂磨蹭。改成把邊界框的半尺寸分別投影到車身的「右方向」和「車頭
+        // 方向」上（AABB 投影到任意方向的標準公式：|d.x|*ex + |d.y|*ey + |d.z|*ez），
+        // 才能正確反映障礙物「有多寬（側向）」跟「有多長（前後）」，不受障礙物實際
+        // 朝向、也不受車輛行進方向是否剛好對齊世界座標軸影響。
         Bounds obstacleBounds = hit.collider != null ? hit.collider.bounds : new Bounds(hit.point, Vector3.one * 2f);
-        float obstacleExtent = Mathf.Max(obstacleBounds.size.x, obstacleBounds.size.y, obstacleBounds.size.z);
-        float scaledClearance = Mathf.Max(avoidLateralClearance, obstacleExtent * 0.5f + avoidLateralClearance);
-        float scaledForwardDistance = Mathf.Max(avoidForwardDistance, obstacleExtent * 0.5f + avoidForwardDistance);
+        Vector3 extents = obstacleBounds.extents;
+        float lateralExtent = Mathf.Abs(transform.right.x) * extents.x + Mathf.Abs(transform.right.y) * extents.y + Mathf.Abs(transform.right.z) * extents.z;
+        float forwardExtent = Mathf.Abs(transform.forward.x) * extents.x + Mathf.Abs(transform.forward.y) * extents.y + Mathf.Abs(transform.forward.z) * extents.z;
+        float scaledClearance = Mathf.Max(avoidLateralClearance, lateralExtent + avoidLateralClearance);
+        float scaledForwardDistance = Mathf.Max(avoidForwardDistance, forwardExtent + avoidForwardDistance);
 
         Vector3 candidateLeft = ComputeAvoidTarget(hit, -1f, scaledClearance, scaledForwardDistance);
         Vector3 candidateRight = ComputeAvoidTarget(hit, 1f, scaledClearance, scaledForwardDistance);

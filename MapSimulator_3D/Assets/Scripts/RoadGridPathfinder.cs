@@ -25,7 +25,11 @@ public class RoadGridPathfinder : MonoBehaviour
     [Tooltip("即使名稱符合上面的開頭，只要包含以下任一關鍵字就視為不可通行（人行道、標線、廣場地磚等）")]
     public List<string> excludeKeywords = new List<string> { "Sidewalk", "Concrete", "Split Line" };
 
+    [Tooltip("計算「最後停靠精準點」時，離人行道方磚邊緣要預留多少距離，確保停靠點還留在道路這一側，不會壓到人行道上")]
+    public float sidewalkStopMargin = 1f;
+
     private readonly Dictionary<Vector2Int, float> roadCellHeights = new Dictionary<Vector2Int, float>();
+    private readonly List<Transform> sidewalkTiles = new List<Transform>();
     private bool isBuilt = false;
 
     private Vector3 boundsCenter;
@@ -44,6 +48,7 @@ public class RoadGridPathfinder : MonoBehaviour
     public void BuildGraph()
     {
         roadCellHeights.Clear();
+        sidewalkTiles.Clear();
         hasBounds = false;
 
         float minX = float.PositiveInfinity, maxX = float.NegativeInfinity;
@@ -64,7 +69,16 @@ public class RoadGridPathfinder : MonoBehaviour
                     break;
                 }
             }
-            if (excluded) continue;
+            if (excluded)
+            {
+                // 人行道/水泥地磚方塊雖然不能走，但「最後停靠精準點」需要知道它們實際佔據的
+                // 世界座標範圍，才能算出「走到人行道前一刻」該停在哪裡（見 AppendPreciseDestinationIfReasonable）。
+                if (n.Contains("Sidewalk") || n.Contains("Concrete"))
+                {
+                    sidewalkTiles.Add(t);
+                }
+                continue;
+            }
 
             Vector2Int cell = WorldToCell(t.position);
             if (!roadCellHeights.ContainsKey(cell))
@@ -350,9 +364,21 @@ public class RoadGridPathfinder : MonoBehaviour
 
         Vector3 direction = (flatPrecise - flatLast) / distance; // 已知 distance > 0.05，安全地手動正規化
 
-        float approachDistance = destinationBounds.HasValue
-            ? Mathf.Clamp(DistanceToBoundsSurface(destinationBounds.Value, flatLast, direction), 0f, distance)
-            : Mathf.Min(distance, gridSize * 0.5f);
+        float approachDistance;
+        if (TryFindSidewalkEntryDistance(flatLast, direction, distance, out float sidewalkEntryDistance))
+        {
+            // 沿路先撞到人行道/水泥地磚：不管建築物邊界框在哪，都優先停在人行道前面，
+            // 這正是使用者要求的「終點節點停在人行道前即可，不要上人行道也不用碰到店家」。
+            approachDistance = Mathf.Max(0f, sidewalkEntryDistance - sidewalkStopMargin);
+        }
+        else if (destinationBounds.HasValue)
+        {
+            approachDistance = Mathf.Clamp(DistanceToBoundsSurface(destinationBounds.Value, flatLast, direction), 0f, distance);
+        }
+        else
+        {
+            approachDistance = Mathf.Min(distance, gridSize * 0.5f);
+        }
 
         Vector3 finalFlatPoint = flatLast + direction * approachDistance;
         route.Add(new Vector3(finalFlatPoint.x, lastPoint.y, finalFlatPoint.z));
@@ -375,6 +401,93 @@ public class RoadGridPathfinder : MonoBehaviour
         float halfExtentAlongDirection = Mathf.Min(alongX, alongZ);
 
         return Mathf.Max(0f, distanceToCenter - halfExtentAlongDirection);
+    }
+
+    /// <summary>
+    /// 從 originFlat 沿 direction 前進最多 maxDistance，找出「最早」進入場景中任何一塊
+    /// 人行道/水泥地磚方塊（BuildGraph 掃描時記錄在 sidewalkTiles 裡）的距離。
+    /// 每塊地磚用它 Renderer 的世界座標邊界框（水平面投影）做射線-方框相交測試——
+    /// 這些方塊本身沒有 Collider（純視覺方塊，車輛實際踩的是底下另一塊看不見的地板），
+    /// 沒辦法用 Physics 打射線判斷，只能直接用幾何邊界框比對。
+    /// </summary>
+    private bool TryFindSidewalkEntryDistance(Vector3 originFlat, Vector3 direction, float maxDistance, out float entryDistance)
+    {
+        if (!isBuilt) BuildGraph();
+
+        entryDistance = maxDistance;
+        bool found = false;
+
+        foreach (Transform tile in sidewalkTiles)
+        {
+            if (tile == null) continue;
+
+            Renderer renderer = tile.GetComponent<Renderer>();
+            if (renderer == null) continue;
+
+            if (!TryGetRayEntryDistanceXZ(renderer.bounds, originFlat, direction, maxDistance, out float candidateDistance))
+            {
+                continue;
+            }
+
+            if (candidateDistance < entryDistance)
+            {
+                entryDistance = candidateDistance;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// 標準的射線-AABB 平面相交測試（slab method），只看水平面（X/Z），忽略高度：
+    /// 算出從 originFlat 出發、沿 direction 前進的射線，第一次進入 bounds 水平投影範圍的距離。
+    /// 跟 DistanceToBoundsSurface 不同的地方是這裡不假設射線一定通過 bounds 中心，
+    /// 適用於「路網終點朝目的地方向前進，途中隨便側面擦過某塊人行道」這種一般情況。
+    /// </summary>
+    private static bool TryGetRayEntryDistanceXZ(Bounds bounds, Vector3 originFlat, Vector3 direction, float maxDistance, out float entryDistance)
+    {
+        entryDistance = 0f;
+
+        float tMinX, tMaxX;
+        if (Mathf.Abs(direction.x) < 0.0001f)
+        {
+            if (originFlat.x < bounds.min.x || originFlat.x > bounds.max.x) return false;
+            tMinX = float.NegativeInfinity;
+            tMaxX = float.PositiveInfinity;
+        }
+        else
+        {
+            float t1 = (bounds.min.x - originFlat.x) / direction.x;
+            float t2 = (bounds.max.x - originFlat.x) / direction.x;
+            tMinX = Mathf.Min(t1, t2);
+            tMaxX = Mathf.Max(t1, t2);
+        }
+
+        float tMinZ, tMaxZ;
+        if (Mathf.Abs(direction.z) < 0.0001f)
+        {
+            if (originFlat.z < bounds.min.z || originFlat.z > bounds.max.z) return false;
+            tMinZ = float.NegativeInfinity;
+            tMaxZ = float.PositiveInfinity;
+        }
+        else
+        {
+            float t1 = (bounds.min.z - originFlat.z) / direction.z;
+            float t2 = (bounds.max.z - originFlat.z) / direction.z;
+            tMinZ = Mathf.Min(t1, t2);
+            tMaxZ = Mathf.Max(t1, t2);
+        }
+
+        float tEnter = Mathf.Max(tMinX, tMinZ);
+        float tExit = Mathf.Min(tMaxX, tMaxZ);
+
+        if (tEnter > tExit) return false; // 水平投影完全沒有重疊
+        if (tExit < 0f) return false; // 方框整個在射線起點後方
+        if (tEnter > maxDistance) return false; // 進入點已經超出我們關心的路段範圍
+
+        entryDistance = Mathf.Max(0f, tEnter);
+        return true;
     }
 
     private bool RoutesAreSimilar(List<Vector3> a, List<Vector3> b)
